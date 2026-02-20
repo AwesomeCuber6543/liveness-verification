@@ -26,7 +26,7 @@ def _load_antispoof_model(model_path: str, device: torch.device):
     kernel_size = get_kernel(h_input, w_input)
     model = MODEL_MAPPING[model_type](conv6_kernel=kernel_size).to(device)
 
-    state_dict = torch.load(model_path, map_location=device, weights_only=True)
+    state_dict = torch.load(model_path, map_location=device, weights_only=False)
     first_key = next(iter(state_dict))
     if first_key.startswith("module."):
         state_dict = OrderedDict(
@@ -48,7 +48,7 @@ def _load_occlusion_model(weight_path: str, device: torch.device):
     in_features = model.classifier[2].in_features
     model.classifier[2] = torch.nn.Linear(in_features, 2)
 
-    checkpoint = torch.load(weight_path, map_location=device, weights_only=True)
+    checkpoint = torch.load(weight_path, map_location=device, weights_only=False)
     state_dict = {
         k.replace("model.", "", 1): v
         for k, v in checkpoint["state_dict"].items()
