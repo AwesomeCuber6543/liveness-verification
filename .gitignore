@@ -1,0 +1,19 @@
+# Environment
+.env
+
+# Python
+__pycache__/
+*.pyc
+
+# Weights (large binary files)
+backend/weights/
+
+# Debug images
+*.png
+
+# Node
+frontend/node_modules/
+frontend/.next/
+
+# OS
+.DS_Store
