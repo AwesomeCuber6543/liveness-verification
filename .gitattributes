@@ -1,2 +1,0 @@
-backend/weights/*.pth filter=lfs diff=lfs merge=lfs -text
-backend/weights/*.task filter=lfs diff=lfs merge=lfs -text

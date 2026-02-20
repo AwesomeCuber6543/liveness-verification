@@ -8,6 +8,10 @@ __pycache__/
 # Debug images
 *.png
 
+# Model weights (downloaded at build time)
+backend/weights/*.pth
+backend/weights/*.task
+
 # Node
 frontend/node_modules/
 frontend/.next/
