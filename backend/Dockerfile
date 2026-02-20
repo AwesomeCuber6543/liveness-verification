@@ -24,4 +24,4 @@ RUN mkdir -p weights && \
     curl -L -o weights/face_landmarker.task \
       https://github.com/AwesomeCuber6543/liveness-verification/releases/download/v1.0-weights/face_landmarker.task
 
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port 8000"]
