@@ -5,9 +5,6 @@
 __pycache__/
 *.pyc
 
-# Weights (large binary files)
-backend/weights/
-
 # Debug images
 *.png
 
