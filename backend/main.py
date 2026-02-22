@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import json
 import logging
 from contextlib import asynccontextmanager
@@ -11,7 +12,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from models.loader import load_all_models
 from processing.face_detection import create_landmarker
 from processing.pipeline import process_frame, process_frame_active
+from processing.flash_pipeline import process_frame_flash
+from processing.flash_scoring import score_flash_liveness
 from state.session import SessionState, ActiveSessionState
+from state.flash_session import FlashSessionState
+from schemas.flash import FlashVerifyRequest
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -227,3 +232,101 @@ async def active_verification(websocket: WebSocket):
     finally:
         logger.info(f"WS active cleanup: processed {frame_count} frames, closing landmarker")
         landmarker.close()
+
+
+@app.websocket("/ws/verify/flash")
+async def flash_verification_ws(websocket: WebSocket):
+    await websocket.accept()
+    session = FlashSessionState()
+    registry = websocket.app.state.registry
+    landmarker = create_landmarker()
+    frame_count = 0
+    latest_frame_bytes: bytes | None = None
+
+    logger.info("WS flash session started")
+
+    async def reader():
+        nonlocal latest_frame_bytes
+        try:
+            while True:
+                message = await websocket.receive()
+                if message.get("type") == "websocket.disconnect":
+                    break
+                if "text" in message:
+                    try:
+                        data = json.loads(message["text"])
+                        if data.get("type") == "reset":
+                            session.reset()
+                            latest_frame_bytes = None
+                            await websocket.send_json({"type": "reset_ack", "step": session.step.value})
+                    except json.JSONDecodeError:
+                        pass
+                if "bytes" in message:
+                    latest_frame_bytes = message["bytes"]
+        except (WebSocketDisconnect, RuntimeError):
+            pass
+
+    async def processor():
+        nonlocal latest_frame_bytes, frame_count
+        try:
+            while True:
+                if latest_frame_bytes is None:
+                    await asyncio.sleep(0.01)
+                    continue
+                jpeg_bytes = latest_frame_bytes
+                latest_frame_bytes = None
+                frame = cv2.imdecode(
+                    np.frombuffer(jpeg_bytes, np.uint8), cv2.IMREAD_COLOR
+                )
+                if frame is None:
+                    await websocket.send_json({"type": "error", "message": "Could not decode frame"})
+                    continue
+                frame_count += 1
+                result = await asyncio.to_thread(
+                    process_frame_flash, frame, registry, session, landmarker
+                )
+                try:
+                    await websocket.send_json(result)
+                except (WebSocketDisconnect, RuntimeError):
+                    break
+        except (WebSocketDisconnect, RuntimeError):
+            pass
+        except asyncio.CancelledError:
+            pass
+
+    try:
+        reader_task = asyncio.create_task(reader())
+        processor_task = asyncio.create_task(processor())
+        await reader_task
+        processor_task.cancel()
+        try:
+            await processor_task
+        except asyncio.CancelledError:
+            pass
+    except (WebSocketDisconnect, RuntimeError) as e:
+        logger.info(f"WS flash session ended: {type(e).__name__}: {e}")
+    finally:
+        logger.info(f"WS flash cleanup: processed {frame_count} frames")
+        landmarker.close()
+
+
+@app.post("/api/verify/flash")
+async def flash_verification_rest(request: FlashVerifyRequest):
+    """Score flash liveness data: challenge log + captured frames."""
+    challenge_log = [
+        {"timestamp": entry.timestamp, "color": entry.color}
+        for entry in request.challenge_log
+    ]
+
+    frames_jpeg = []
+    frame_timestamps = []
+    for entry in request.frames:
+        jpeg_bytes = base64.b64decode(entry.jpeg_b64)
+        frames_jpeg.append(jpeg_bytes)
+        frame_timestamps.append(entry.timestamp)
+
+    result = await asyncio.to_thread(
+        score_flash_liveness, challenge_log, frames_jpeg, frame_timestamps
+    )
+
+    return result

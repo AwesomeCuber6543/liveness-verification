@@ -40,6 +40,7 @@ class FrameResponse(BaseModel):
     landmarks: LandmarkResult | None = None
     antispoof: AntiSpoofResult | None = None
     challenge: ChallengeResult | None = None
+    face_too_small: bool = False
 
 
 class VerificationResponse(BaseModel):
