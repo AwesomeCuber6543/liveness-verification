@@ -60,9 +60,6 @@ def process_frame(frame_bgr: np.ndarray, registry: ModelRegistry, session: Sessi
         # Run occlusion check
         x, y, w, h = bbox["x"], bbox["y"], bbox["width"], bbox["height"]
         face_crop = frame_bgr[y:y+h, x:x+w]
-        # Debug: save face crop and full frame
-        cv2.imwrite("face_crop.png", face_crop)
-        cv2.imwrite("full_frame.png", frame_bgr)
         t2 = time.perf_counter()
         if face_crop.size > 0:
             occ_pred, occ_conf = predict_occlusion(
@@ -180,8 +177,6 @@ def process_frame_active(frame_bgr: np.ndarray, registry: ModelRegistry, session
     if session.step == VerificationStep.CHECKING_OCCLUSION:
         x, y, w, h = bbox["x"], bbox["y"], bbox["width"], bbox["height"]
         face_crop = frame_bgr[y:y+h, x:x+w]
-        cv2.imwrite("active_face_crop.png", face_crop)
-        cv2.imwrite("active_full_frame.png", frame_bgr)
         if face_crop.size > 0:
             occ_pred, occ_conf = predict_occlusion(
                 face_crop, registry.occlusion_model,
@@ -210,7 +205,6 @@ def process_frame_active(frame_bgr: np.ndarray, registry: ModelRegistry, session
         ).model_dump()
 
     if session.step == VerificationStep.CHALLENGE:
-        cv2.imwrite("active_challenge_frame.png", frame_bgr)
         mouth_hold_duration = 0.0
 
         logger.info(f"[Active CHALLENGE] raw_mouth={session.mouth_open}, history={list(session.mouth_history)}, smoothed={mouth_open_smoothed}, timer_start={session.mouth_open_start}")
