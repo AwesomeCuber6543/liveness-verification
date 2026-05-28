@@ -21,7 +21,7 @@ def predict_ensemble(frame, bbox, registry: ModelRegistry):
     """Run all anti-spoof models on different scale crops and average predictions.
     Returns (label, confidence) where label=1 means Real."""
     bbox_list = [bbox["x"], bbox["y"], bbox["width"], bbox["height"]]
-    prediction = np.zeros((1, 3))
+    prediction = None
 
     for as_model in registry.antispoof_models:
         crop_scale = as_model.scale if as_model.scale is not None else 1.0
@@ -34,7 +34,10 @@ def predict_ensemble(frame, bbox, registry: ModelRegistry):
             crop=as_model.scale is not None,
         )
         result = predict_single(patch, as_model.model, registry.device)
-        prediction += result
+        if prediction is None:
+            prediction = result
+        else:
+            prediction += result
 
     prediction /= len(registry.antispoof_models)
     label = int(np.argmax(prediction))
